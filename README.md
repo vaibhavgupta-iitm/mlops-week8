@@ -581,7 +581,6 @@ additional_needed = original_size × (poison_rate / (1 - poison_rate × 0.6))
 ## 📊 Understanding Results
 
 ### Expected Results by Attack Type
-
 #### Baseline (Clean Data)
 ```
 Accuracy: 96.00%
