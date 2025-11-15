@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week6/mlruns/891531772762165779/a31150283442463cbb85cb952416783b/artifacts
+end_time: 1763198825306
+entry_point_name: ''
+experiment_id: '891531772762165779'
+lifecycle_stage: active
+run_id: a31150283442463cbb85cb952416783b
+run_name: random_noise_5pct
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763198825198
+status: 3
+tags: []
+user_id: vaibhavgupta

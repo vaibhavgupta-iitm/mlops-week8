@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/643442710647968416/04def5f87f4a45dc893198f4dfd002c7/artifacts
+end_time: 1761930420200
+entry_point_name: ''
+experiment_id: '643442710647968416'
+lifecycle_stage: active
+run_id: 04def5f87f4a45dc893198f4dfd002c7
+run_name: cv_fold_8
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761930420194
+status: 3
+tags: []
+user_id: vaibhavgupta

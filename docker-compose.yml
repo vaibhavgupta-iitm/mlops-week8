@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  web:
+    # Replace 'your-username' with your actual Docker Hub username
+    image: your-username/microservices-demo:22f2000120
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-web
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-backend
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    command: redis-server --appendonly yes
+
+networks:
+  app-network:
+    driver: bridge
+volumes:
+  redis-data:
+    driver: local

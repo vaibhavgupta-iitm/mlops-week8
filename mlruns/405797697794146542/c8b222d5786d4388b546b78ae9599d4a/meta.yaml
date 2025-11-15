@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/405797697794146542/c8b222d5786d4388b546b78ae9599d4a/artifacts
+end_time: 1762101642146
+entry_point_name: ''
+experiment_id: '405797697794146542'
+lifecycle_stage: active
+run_id: c8b222d5786d4388b546b78ae9599d4a
+run_name: conservative_split
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1762101640418
+status: 3
+tags: []
+user_id: vaibhavgupta

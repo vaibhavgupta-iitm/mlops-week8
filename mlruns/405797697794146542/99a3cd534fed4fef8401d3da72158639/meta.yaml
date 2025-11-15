@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/405797697794146542/99a3cd534fed4fef8401d3da72158639/artifacts
+end_time: 1762101638664
+entry_point_name: ''
+experiment_id: '405797697794146542'
+lifecycle_stage: active
+run_id: 99a3cd534fed4fef8401d3da72158639
+run_name: baseline_deep
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1762101636710
+status: 3
+tags: []
+user_id: vaibhavgupta

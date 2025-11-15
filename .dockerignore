@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# MLflow (don't include in image, will be loaded at runtime)
+mlartifacts/
+
+# DVC
+.dvc/
+*.dvc
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# CI/CD
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data files (should be loaded from DVC/external sources)
+*.csv
+*.xlsx
+*.json
+iris-dvc-pipeline/
+
+# Model files (use MLflow instead)
+*.joblib
+*.pkl
+*.pickle
+*.h5
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# Environment
+.env
+.env.local

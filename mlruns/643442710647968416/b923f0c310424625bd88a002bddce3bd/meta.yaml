@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/643442710647968416/b923f0c310424625bd88a002bddce3bd/artifacts
+end_time: 1761930289368
+entry_point_name: ''
+experiment_id: '643442710647968416'
+lifecycle_stage: active
+run_id: b923f0c310424625bd88a002bddce3bd
+run_name: single_model_training
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761930286834
+status: 3
+tags: []
+user_id: vaibhavgupta

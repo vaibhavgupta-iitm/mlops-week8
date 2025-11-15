@@ -1,0 +1,44 @@
+# Core ML libraries
+pandas
+scikit-learn
+numpy
+joblib
+
+# Google Cloud Platform
+google-cloud-storage
+google-cloud-aiplatform
+
+# DVC for data versioning
+dvc
+dvc-gs
+
+# MLflow for experiment tracking and model registry
+mlflow
+
+# Visualization (for confusion matrix and plots)
+matplotlib
+seaborn
+
+# FastAPI and API server
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# HTTP client (for health checks and testing)
+requests
+
+# Testing
+pytest
+pytest-cov
+httpx # For testing FastAPI endpoints
+
+# Additional utilities
+python-dotenv # For environment variable management
+pyyaml # For YAML configuration files
+
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-gcp-trace
+opentelemetry-instrumentation-requests

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iris-api
+  labels:
+    app: iris-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: iris-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: iris-api
+        version: v1
+    spec:
+      serviceAccountName: telemetry-access
+      containers:
+      - name: iris-api
+        image: REGION-docker.pkg.dev/PROJECT_ID/iris-api/iris-classifier:TAG  # Will be replaced by CI/CD
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: MODEL_NAME
+          value: "iris-classifier"
+        - name: MODEL_STAGE
+          value: "Production"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: GCP_PROJECT_ID
+          value: "verdant-victory-473118-k0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # 30 * 10s = 5 minutes max startup time
+        # Liveness probe - restart if unhealthy
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # Readiness probe - don't send traffic until ready
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+      # Security context
+      securityContext:
+        runAsNonRoot: false  # Changed to false since we need to install packages
+        fsGroup: 1000

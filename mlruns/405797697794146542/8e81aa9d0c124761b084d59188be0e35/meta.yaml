@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/405797697794146542/8e81aa9d0c124761b084d59188be0e35/artifacts
+end_time: 1762101640416
+entry_point_name: ''
+experiment_id: '405797697794146542'
+lifecycle_stage: active
+run_id: 8e81aa9d0c124761b084d59188be0e35
+run_name: entropy_criterion
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1762101638665
+status: 3
+tags: []
+user_id: vaibhavgupta

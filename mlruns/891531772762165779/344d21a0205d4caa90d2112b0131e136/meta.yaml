@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week6/mlruns/891531772762165779/344d21a0205d4caa90d2112b0131e136/artifacts
+end_time: 1763198826148
+entry_point_name: ''
+experiment_id: '891531772762165779'
+lifecycle_stage: active
+run_id: 344d21a0205d4caa90d2112b0131e136
+run_name: targeted_50pct
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763198826049
+status: 3
+tags: []
+user_id: vaibhavgupta

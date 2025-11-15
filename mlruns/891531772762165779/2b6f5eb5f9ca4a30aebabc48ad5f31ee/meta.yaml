@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week6/mlruns/891531772762165779/2b6f5eb5f9ca4a30aebabc48ad5f31ee/artifacts
+end_time: 1763198827645
+entry_point_name: ''
+experiment_id: '891531772762165779'
+lifecycle_stage: active
+run_id: 2b6f5eb5f9ca4a30aebabc48ad5f31ee
+run_name: comprehensive_analysis
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763198826149
+status: 3
+tags: []
+user_id: vaibhavgupta

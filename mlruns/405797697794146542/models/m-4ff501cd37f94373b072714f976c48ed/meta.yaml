@@ -1,0 +1,10 @@
+artifact_location: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/405797697794146542/models/m-4ff501cd37f94373b072714f976c48ed/artifacts
+creation_timestamp: 1761930599656
+experiment_id: '405797697794146542'
+last_updated_timestamp: 1761930605230
+model_id: m-4ff501cd37f94373b072714f976c48ed
+model_type: null
+name: model
+source_run_id: 0989e0a7c9624428b32fa400362767ca
+status: 2
+status_message: null

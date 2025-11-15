@@ -1,0 +1,6 @@
+artifact_location: file:///Users/vaibhavgupta/Developer/MLOps/Week6/mlruns/891531772762165779
+creation_time: 1763197956738
+experiment_id: '891531772762165779'
+last_update_time: 1763197956738
+lifecycle_stage: active
+name: iris-poisoning-experiments

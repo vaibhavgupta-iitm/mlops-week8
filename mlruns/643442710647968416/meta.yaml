@@ -1,0 +1,6 @@
+artifact_location: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/643442710647968416
+creation_time: 1761930286654
+experiment_id: '643442710647968416'
+last_update_time: 1761930286654
+lifecycle_stage: active
+name: iris-classification

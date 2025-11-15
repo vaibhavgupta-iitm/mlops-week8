@@ -1,0 +1,15 @@
+creation_timestamp: 1761930605249
+current_stage: None
+deployment_job_state: null
+description: null
+last_updated_timestamp: 1761930605249
+model_id: m-4ff501cd37f94373b072714f976c48ed
+name: iris-classifier
+run_id: 0989e0a7c9624428b32fa400362767ca
+run_link: null
+source: models:/m-4ff501cd37f94373b072714f976c48ed
+status: READY
+status_message: null
+storage_location: file:///Users/vaibhavgupta/Developer/MLOps/Week5/mlruns/405797697794146542/models/m-4ff501cd37f94373b072714f976c48ed/artifacts
+user_id: null
+version: 6

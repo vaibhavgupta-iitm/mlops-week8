@@ -1,0 +1,87 @@
+# ---------------------------
+# Python
+# ---------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+
+# Virtual environment
+venv/
+.env/
+env/
+.venv/
+
+# VSCode settings
+.vscode/
+*.code-workspace
+
+# ---------------------------
+# DVC
+# ---------------------------
+.cache/
+tmp/
+*.lock
+.dvc/tmp/
+.dvc/cache/
+**/*.dvc.lock
+# Keep .dvc config and .dvc files that track data
+!*.dvc
+!.dvc/config
+
+# ---------------------------
+# Data and models
+# ---------------------------
+data/
+datasets/
+*.joblib
+*.pkl
+*.h5
+*.ckpt
+*.pt
+
+# ---------------------------
+# Google Cloud / Credentials
+# ---------------------------
+gcp_auth_key.json
+*.json
+!iris-dvc-pipeline/*.json  # allow JSONs in this specific folder if needed
+
+# ---------------------------
+# Reports / Tests / Coverage
+# ---------------------------
+htmlcov/
+coverage.xml
+*.coverage
+.pytest_cache/
+reports/
+*.out
+*.err
+
+# ---------------------------
+# OS / Miscellaneous
+# ---------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+
+# ---------------------------
+# GitHub Actions artifacts
+# ---------------------------
+*.log
+*.tmp
+*.gz
+
+# ---------------------------
+# Allow CI/CD config to be tracked
+# ---------------------------
+!.github/workflows/

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/vaibhavgupta/Developer/MLOps/Week6/mlruns/891531772762165779/cd52f297e20643caa6585646014fe141/artifacts
+end_time: 1763198825718
+entry_point_name: ''
+experiment_id: '891531772762165779'
+lifecycle_stage: active
+run_id: cd52f297e20643caa6585646014fe141
+run_name: label_flip_10pct
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763198825623
+status: 3
+tags: []
+user_id: vaibhavgupta

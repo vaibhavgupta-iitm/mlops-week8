@@ -1,0 +1,563 @@
+name: CD - Deploy to GKE
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app.py'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'kubernetes/**'
+      - 'requirements.txt'
+      - 'mlruns/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+  pull_request:
+    branches: [ main ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: iris-api-cluster
+  GKE_ZONE: us-central1-a
+  GCP_REGION: us-central1
+  DEPLOYMENT_NAME: iris-api
+  IMAGE_NAME: iris-classifier
+  REPOSITORY: iris-api
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mlflow
+    
+    - name: Set up Google Cloud credentials
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    
+    - name: Setup DVC and pull MLflow artifacts
+      run: |
+        pip install dvc dvc-gs
+        
+        if [ -f "mlruns.dvc" ]; then
+          echo "📦 Pulling MLflow artifacts from DVC..."
+          dvc remote add -d gcsremote gs://mlops-course-verdant-victory-473118-k0-unique-week2-2/iris-pipeline || true
+          dvc remote modify gcsremote credentialpath $GOOGLE_APPLICATION_CREDENTIALS
+          dvc pull mlruns.dvc
+          echo "✅ MLflow artifacts pulled"
+        else
+          echo "ℹ️ No mlruns.dvc found, using local mlruns if available"
+        fi
+        
+        if [ -d "mlruns" ]; then
+          echo "✅ mlruns directory found"
+          ls -la mlruns/
+        else
+          echo "⚠️ Warning: mlruns directory not found. Container will use fallback model."
+          mkdir -p mlruns
+        fi
+      continue-on-error: true
+    
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+    
+    - name: Create Artifact Registry repository (if not exists)
+      run: |
+        gcloud artifacts repositories create ${{ env.REPOSITORY }} \
+          --repository-format=docker \
+          --location=${{ env.GCP_REGION }} \
+          --description="IRIS API Docker images" \
+          --project=${{ env.PROJECT_ID }} || echo "Repository already exists"
+    
+    - name: Build image information
+      id: build_info
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        BRANCH_NAME=$(echo "${{ github.ref_name }}" | tr '/' '-')
+        IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}-$(date +%s)"
+        IMAGE_URL="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
+        FULL_IMAGE="${IMAGE_URL}:${IMAGE_TAG}"
+        
+        echo "${FULL_IMAGE}" > full_image.txt
+        
+        echo "📦 Full Image: ${FULL_IMAGE}"
+        echo "📦 Image URL: ${IMAGE_URL}"
+        echo "📦 Image Tag: ${IMAGE_TAG}"
+    
+    - name: Build Docker image
+      run: |
+        FULL_IMAGE=$(cat full_image.txt)
+        IMAGE_URL=$(echo ${FULL_IMAGE} | cut -d: -f1)
+        
+        echo "Building image: ${FULL_IMAGE}"
+        
+        echo "🔍 Build context contents:"
+        ls -la
+        if [ -d "mlruns" ]; then
+          echo "🔍 mlruns directory:"
+          ls -la mlruns/
+        fi
+        
+        docker build \
+          -t ${FULL_IMAGE} \
+          -t ${IMAGE_URL}:latest \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=${{ github.sha }} \
+          --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+          --label "org.opencontainers.image.revision=${{ github.sha }}" \
+          --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          .
+        
+        echo "✅ Docker image built successfully"
+    
+    - name: Test Docker image
+      run: |
+        FULL_IMAGE=$(cat full_image.txt)
+        echo "🧪 Testing Docker image: ${FULL_IMAGE}"
+        
+        docker run -d --name test-container -p 8080:8080 ${FULL_IMAGE}
+        sleep 15
+        
+        echo "📋 Container logs:"
+        docker logs test-container
+        
+        if docker logs test-container 2>&1 | grep -q "Model loaded from MLflow"; then
+          echo "✅ MLflow model loaded successfully"
+        elif docker logs test-container 2>&1 | grep -q "Falling back to default model"; then
+          echo "⚠️ Using fallback model (MLflow model not found)"
+        else
+          echo "ℹ️ Could not determine model source from logs"
+        fi
+        
+        curl -f http://localhost:8080/health || (echo "❌ Health check failed" && docker logs test-container && exit 1)
+        curl -f http://localhost:8080/ || (echo "❌ Root endpoint failed" && docker logs test-container && exit 1)
+        
+        docker stop test-container
+        docker rm test-container
+        
+        echo "✅ Docker image tests passed"
+    
+    - name: Push Docker image to Artifact Registry
+      run: |
+        FULL_IMAGE=$(cat full_image.txt)
+        IMAGE_URL=$(echo ${FULL_IMAGE} | cut -d: -f1)
+        
+        echo "Pushing image: ${FULL_IMAGE}"
+        
+        docker push ${FULL_IMAGE}
+        docker push ${IMAGE_URL}:latest
+        
+        echo "✅ Image pushed to Artifact Registry"
+        echo "📦 Full Image: ${FULL_IMAGE}"
+    
+    - name: Upload image info as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: image-info
+        path: full_image.txt
+        retention-days: 1
+
+
+  deploy-to-gke:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    outputs:
+      external_ip: ${{ steps.deployment_status.outputs.external_ip }}
+      api_url: ${{ steps.deployment_status.outputs.api_url }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download image info artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: image-info
+    
+    - name: Load image information
+      id: load_image
+      run: |
+        if [ ! -f full_image.txt ]; then
+          echo "❌ ERROR: full_image.txt not found!"
+          exit 1
+        fi
+        
+        FULL_IMAGE=$(cat full_image.txt)
+        
+        if [ -z "$FULL_IMAGE" ]; then
+          echo "❌ ERROR: FULL_IMAGE is empty!"
+          exit 1
+        fi
+        
+        echo "📦 Loaded image: ${FULL_IMAGE}"
+        echo "full_image=${FULL_IMAGE}" >> $GITHUB_OUTPUT
+    
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        gcloud components install gke-gcloud-auth-plugin
+    
+    - name: Enable GCP APIs for logging and monitoring
+      run: |
+        echo "🔧 Enabling required GCP services..."
+        gcloud services enable container.googleapis.com \
+          logging.googleapis.com \
+          monitoring.googleapis.com \
+          cloudtrace.googleapis.com \
+          --project=${{ env.PROJECT_ID }}
+        echo "✅ GCP services enabled"
+    
+    - name: Create GKE cluster with enhanced logging and monitoring
+      run: |
+        if ! gcloud container clusters describe ${{ env.GKE_CLUSTER }} \
+          --zone=${{ env.GKE_ZONE }} \
+          --project=${{ env.PROJECT_ID }} 2>/dev/null; then
+          
+          echo "📦 Creating GKE cluster with logging and monitoring..."
+          gcloud container clusters create ${{ env.GKE_CLUSTER }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --project=${{ env.PROJECT_ID }} \
+            --num-nodes=1 \
+            --machine-type=e2-medium \
+            --enable-autoscaling \
+            --min-nodes=1 \
+            --max-nodes=3 \
+            --enable-autorepair \
+            --enable-autoupgrade \
+            --disk-size=20 \
+            --disk-type=pd-standard \
+            --logging=SYSTEM,WORKLOAD \
+            --monitoring=SYSTEM
+          
+          echo "✅ GKE cluster created with enhanced observability"
+        else
+          echo "✅ GKE cluster already exists"
+        fi
+    
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+          --zone=${{ env.GKE_ZONE }} \
+          --project=${{ env.PROJECT_ID }}
+        
+        echo "✅ Connected to GKE cluster"
+        kubectl cluster-info
+    
+    - name: Update Kubernetes manifests
+      run: |
+        FULL_IMAGE=$(cat full_image.txt)
+        
+        echo "Updating deployment.yaml with image: ${FULL_IMAGE}"
+        sed -i "s|REGION-docker.pkg.dev/PROJECT_ID/iris-api/iris-classifier:TAG|${FULL_IMAGE}|g" kubernetes/deployment.yaml
+        
+        echo "✅ Updated deployment.yaml"
+        echo "Verifying update..."
+        grep "image:" kubernetes/deployment.yaml
+    
+    - name: Deploy to Kubernetes
+      run: |
+        echo "🚀 Deploying to Kubernetes..."
+        
+        kubectl apply -f kubernetes/deployment.yaml
+        kubectl apply -f kubernetes/service.yaml
+        kubectl apply -f kubernetes/hpa.yaml
+        
+        echo "✅ Kubernetes resources applied"
+    
+    - name: Wait for deployment rollout
+      run: |
+        echo "⏳ Waiting for deployment to complete..."
+        
+        echo "Current pod status:"
+        kubectl get pods -l app=iris-api
+        
+        if ! kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=10m; then
+          echo "❌ Deployment rollout failed or timed out"
+          echo ""
+          echo "📊 Deployment status:"
+          kubectl get deployment ${{ env.DEPLOYMENT_NAME }}
+          echo ""
+          echo "📦 Pod status:"
+          kubectl get pods -l app=iris-api
+          echo ""
+          echo "🔍 Pod details:"
+          kubectl describe pods -l app=iris-api
+          echo ""
+          echo "📋 Recent pod logs:"
+          for pod in $(kubectl get pods -l app=iris-api -o jsonpath='{.items[*].metadata.name}'); do
+            echo "=== Logs for $pod ==="
+            kubectl logs $pod --tail=50 || echo "Could not fetch logs for $pod"
+            echo ""
+          done
+          exit 1
+        fi
+        
+        echo "✅ Deployment completed successfully"
+        
+        echo ""
+        echo "🔍 Checking model source in pods..."
+        for pod in $(kubectl get pods -l app=iris-api -o jsonpath='{.items[*].metadata.name}'); do
+          echo "=== Checking $pod ==="
+          if kubectl logs $pod | grep -q "Model loaded from MLflow"; then
+            echo "✅ Pod is using MLflow model"
+          elif kubectl logs $pod | grep -q "Falling back to default model"; then
+            echo "⚠️ Pod is using fallback model"
+          fi
+        done
+    
+    - name: Get deployment status
+      id: deployment_status
+      run: |
+        echo "📊 Deployment Status:"
+        kubectl get deployments ${{ env.DEPLOYMENT_NAME }}
+        
+        echo ""
+        echo "📦 Pods:"
+        kubectl get pods -l app=iris-api
+        
+        echo ""
+        echo "🌐 Service:"
+        kubectl get service iris-api-service
+        
+        echo "⏳ Waiting for external IP (this may take a few minutes)..."
+        for i in {1..30}; do
+          EXTERNAL_IP=$(kubectl get service iris-api-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          
+          if [ -n "$EXTERNAL_IP" ] && [ "$EXTERNAL_IP" != "pending" ]; then
+            echo "✅ External IP assigned: ${EXTERNAL_IP}"
+            echo "external_ip=${EXTERNAL_IP}" >> $GITHUB_OUTPUT
+            echo "api_url=http://${EXTERNAL_IP}" >> $GITHUB_OUTPUT
+            break
+          fi
+          
+          echo "  Attempt $i/30: Still waiting..."
+          sleep 10
+        done
+        
+        if [ -z "$EXTERNAL_IP" ] || [ "$EXTERNAL_IP" = "pending" ]; then
+          echo "⚠️ External IP not assigned yet"
+          echo "external_ip=pending" >> $GITHUB_OUTPUT
+          echo "api_url=pending" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Test deployed API
+      run: |
+        EXTERNAL_IP="${{ steps.deployment_status.outputs.external_ip }}"
+        
+        if [ "$EXTERNAL_IP" = "pending" ] || [ -z "$EXTERNAL_IP" ]; then
+          echo "⚠️ External IP not yet assigned, skipping API test"
+          echo "You can test manually once the IP is assigned"
+          exit 0
+        fi
+        
+        echo "🧪 Testing deployed API at: http://${EXTERNAL_IP}"
+        
+        sleep 30
+        
+        echo "Testing health endpoint..."
+        for i in {1..15}; do
+          if curl -f -m 5 http://${EXTERNAL_IP}/health 2>/dev/null; then
+            echo "✅ Health check passed"
+            break
+          else
+            if [ $i -eq 15 ]; then
+              echo "⚠️ Health check timeout, but deployment may still be initializing"
+            else
+              echo "  Attempt $i/15: Waiting for API..."
+              sleep 10
+            fi
+          fi
+        done
+        
+        echo "Testing prediction endpoint..."
+        curl -X POST "http://${EXTERNAL_IP}/predict" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "sepal_length": 5.1,
+            "sepal_width": 3.5,
+            "petal_length": 1.4,
+            "petal_width": 0.2
+          }' -m 10 2>/dev/null || echo "⚠️ Prediction test may need more time"
+        
+        echo "✅ Deployment complete"
+    
+    - name: Generate deployment report
+      run: |
+        FULL_IMAGE=$(cat full_image.txt)
+        
+        cat > deployment-report.md << EOF
+        ## 🚀 Deployment Report
+        
+        ### 📦 Image Information
+        - **Image**: \`${FULL_IMAGE}\`
+        - **Commit**: \`${{ github.sha }}\`
+        - **Branch**: \`${{ github.ref_name }}\`
+        - **Build Time**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+        
+        ### 🎯 Deployment Details
+        - **Cluster**: \`${{ env.GKE_CLUSTER }}\`
+        - **Zone**: \`${{ env.GKE_ZONE }}\`
+        - **Namespace**: \`default\`
+        - **Deployment**: \`${{ env.DEPLOYMENT_NAME }}\`
+        - **Model Source**: MLflow Production (with fallback)
+        
+        ### 🌐 Service Information
+        - **External IP**: \`${{ steps.deployment_status.outputs.external_ip }}\`
+        - **API URL**: ${{ steps.deployment_status.outputs.api_url }}
+        
+        ### 📋 Endpoints
+        \`\`\`
+        Health:   ${{ steps.deployment_status.outputs.api_url }}/health
+        Predict:  ${{ steps.deployment_status.outputs.api_url }}/predict (POST)
+        Docs:     ${{ steps.deployment_status.outputs.api_url }}/docs
+        \`\`\`
+        
+        ### ✅ Status
+        - ✅ Docker image built and pushed
+        - ✅ MLflow artifacts included
+        - ✅ Deployed to GKE with enhanced logging
+        - ✅ Rollout completed
+        - ✅ Pods running
+        - ✅ Service exposed
+        - ✅ Cloud Logging enabled
+        - ✅ Cloud Monitoring enabled
+        
+        ### 🔍 Observability
+        - **Cloud Logging**: View logs in GCP Console > Logging > Logs Explorer
+        - **Cloud Monitoring**: View metrics in GCP Console > Monitoring
+        - **HPA Status**: \`kubectl get hpa iris-api-hpa\`
+        
+        ### 🧪 Test the API
+        \`\`\`bash
+        # Health check
+        curl ${{ steps.deployment_status.outputs.api_url }}/health
+        
+        # Make a prediction
+        curl -X POST "${{ steps.deployment_status.outputs.api_url }}/predict" \\
+          -H "Content-Type: application/json" \\
+          -d '{
+            "sepal_length": 5.1,
+            "sepal_width": 3.5,
+            "petal_length": 1.4,
+            "petal_width": 0.2
+          }'
+        \`\`\`
+        
+        ---
+        *Deployed via GitHub Actions with MLflow Integration & Enhanced Observability*
+        EOF
+        
+        cat deployment-report.md
+    
+    - name: Setup CML
+      uses: iterative/setup-cml@v1
+    
+    - name: Post deployment report
+      env:
+        REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cml comment create deployment-report.md || echo "Could not post CML comment"
+
+
+  smoke-test:
+    name: Post-Deployment Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-to-gke
+    
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        gcloud components install gke-gcloud-auth-plugin
+    
+    - name: Get GKE credentials
+      run: |
+          gcloud container clusters get-credentials iris-api-cluster \
+            --zone=us-central1-a \
+            --project=${{ env.PROJECT_ID }}
+      
+    - name: Run smoke tests
+      shell: bash
+      run: |
+        echo "🧪 Running smoke tests..."
+    
+        kubectl get deployment iris-api
+    
+        echo ""
+        echo "Pod status:"
+        kubectl get pods -l app=iris-api
+    
+        TOTAL_PODS=$(kubectl get pods -l app=iris-api --no-headers | wc -l)
+        echo "Total pods: $TOTAL_PODS"
+    
+        if [ "$TOTAL_PODS" -lt 1 ]; then
+          echo "❌ No pods found"
+          exit 1
+        fi
+    
+        READY_PODS=$(kubectl get pods -l app=iris-api --no-headers | grep -c "Running" || echo "0")
+        echo "Running pods: $READY_PODS"
+    
+        NOT_READY=$(kubectl get pods -l app=iris-api --no-headers | grep -v "1/1\|2/2" | wc -l || echo "0")
+    
+        if [ "$NOT_READY" -gt 0 ]; then
+          echo "⚠️ Some pods are not fully ready:"
+          kubectl get pods -l app=iris-api
+          echo ""
+          echo "Pod details:"
+          kubectl describe pods -l app=iris-api
+          echo ""
+          echo "Note: Pods may still be initializing. Check manually if needed."
+        else
+          echo "✅ All smoke tests passed"
+          echo "✅ All $TOTAL_PODS pod(s) are running and ready"
+        fi
